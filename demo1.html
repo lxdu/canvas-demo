@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>mydemo</title>
+	<style>
+		body {
+			margin: 0;
+			overflow: hidden;
+			font-size: 0;
+		}
+		
+		canvas {
+			background: black;
+			width: 100vw;
+			height: 100vh;
+		}
+		
+		input {
+			width: 250px;
+			height: 40px;
+			line-height: 40px;
+			position: absolute;
+			bottom: 35px;
+			left: calc(50% - 125px);
+			background: none;
+			color: white;
+			font-size: 30px;
+			font-family: arial;
+			text-align: center;
+			border: 1px solid white;
+			background: rgba(255, 255, 255, 0.2);
+		}
+	</style>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+</head>
+
+<body>
+	<canvas id="scene">您的浏览器不支持canvas</canvas>
+	<input id="copy" type="text" value="Hellow Canvas" />
+	<script>
+        var canvas=document.querySelector("#scene");
+        var copy = document.querySelector("#copy");
+        var ctx=canvas.getContext("2d");
+
+        //小圆点相关变量
+        //颜色数组
+        var colors=["#ef9898","#e8ea78","#78eaac","#78afea","#ef98ec"];
+        //本体数组
+        var particles=[];
+        //数量,相当于particles.length
+        var amount=0;
+        //半径
+        radius=1;
+        //圆心位置，即鼠标当前位置
+        mouse={x:0,y:0};
+        //画布的宽高，即获取可视区的宽高对齐进行重新定义
+        var ww = canvas.width = window.innerWidth;
+        var wh = canvas.height = window.innerHeight;
+
+        //制作小圆点
+        /*
+        ** 面向对象的写法
+        ** (x,y)【参数】小圆点的位置，即圆心位置
+        ** render()【方法】用来渲染小圆点
+        */
+        function Particle(x,y){
+            this.x=Math.random()*ww; //获取一个屏幕中任意位置
+            this.y=Math.random()*wh;
+            this.dest = { //把传入的点作为最终目标位置，即最后应该停留的位置
+                x : x, 
+                y : y
+            };
+            this.r =  Math.random()*5 + 2;  //随机半径（颗粒大小）(范围2~7)
+            this.vx = (Math.random()-0.5)*20; //每一步的目标位置
+            this.vy = (Math.random()-0.5)*20; //范围（-10~10）
+            this.accX = 0; //
+            this.accY = 0; //
+            this.friction = Math.random()*0.05 + 0.94;//随机摩擦力（缓冲的动画效果,0.94~1）
+            this.color = colors[Math.floor(Math.random()*6)];   //随机颜色
+        }
+        //颗粒原型
+        Particle.prototype.render = function() {
+            this.accX = (this.dest.x - this.x)/1000;//把总距离分成1000份，每份即作为每一步的移动距离
+            this.accY = (this.dest.y - this.y)/1000;
+            this.vx += this.accX; //每次加一份
+            this.vy += this.accY;
+            this.vx *= this.friction;
+            this.vy *= this.friction;
+
+            this.x += this.vx;//每一步的目标位置变成当前位置
+            this.y +=  this.vy;
+
+            //画小圆点
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.r, Math.PI * 2, false);
+            ctx.fill();
+
+            var a = this.x - mouse.x; 
+            var b = this.y - mouse.y;
+
+            var distance = Math.sqrt( a*a + b*b ); //鼠标和小圆点的径向距离
+            if(distance<(radius*70)){
+                this.accX = (this.x - mouse.x)/100; //把新的目标距离分成100份
+                this.accY = (this.y - mouse.y)/100;
+                this.vx += this.accX; //每次走一份
+                this.vy += this.accY;
+            }
+        }
+
+        //初始化函数
+        function initScene(){
+            ww = canvas.width = window.innerWidth;
+            wh = canvas.height = window.innerHeight;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);   //清空 Canvas
+
+            ctx.font = "bold "+(ww/10)+"px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(copy.value, ww/2, wh/2);               //将 Input 中输入的值，打印在 Canvas 上
+
+            var data  = ctx.getImageData(0, 0, ww, wh).data;    //获取图像数据
+            ctx.clearRect(0, 0, canvas.width, canvas.height);   //清空 Canvas
+            ctx.globalCompositeOperation = "screen";
+
+            particles = [];
+            for(var i=0;i<ww;i+=Math.round(ww/150)){
+                for(var j=0;j<wh;j+=Math.round(ww/150)){
+                    if(data[ ((i + j*ww)*4) + 3] > 150){
+                        particles.push(new Particle(i,j));      //将图像数据经过 Particle 函数处理后 push 到 particles 数组中
+                    }
+                }
+            }
+            amount = particles.length;                          //获得 particles 的长度
+        }
+
+        //鼠标点击事件（点击一次 radius++ 当 radius === 5 时，radius = 0）
+        function onMouseClick(){
+            radius++;
+            if(radius === 5){
+                radius = 0;
+            }
+        }
+
+        //渲染函数
+        function render(a) {
+            requestAnimationFrame(render);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);   //清空 Canvas
+            for (var i = 0; i < amount; i++) {
+                particles[i].render();                          //循环 particles 数组渲染
+            }
+        };
+
+        /*
+        ** 绑定事件并赋值给mouse
+        */
+        //鼠标移动函数
+        function onMouseMove(e){
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        }
+
+        //触摸移动函数
+        function onTouchMove(e){
+            //touches 多点触摸数组
+            if(e.touches.length > 0 ){
+                mouse.x = e.touches[0].clientX;
+                mouse.y = e.touches[0].clientY;
+            }
+        }
+
+        //触摸结束函数
+        function onTouchEnd(e){
+            mouse.x = -9999;
+            mouse.y = -9999;
+        }
+        //监听事件
+        copy.addEventListener("keyup", initScene);              //键盘按下
+        window.addEventListener("resize", initScene);           //可视窗口改变
+        window.addEventListener("mousemove", onMouseMove);      //鼠标移动
+        window.addEventListener("touchmove", onTouchMove);      //触摸移动
+        window.addEventListener("click", onMouseClick);         //点击
+        window.addEventListener("touchend", onTouchEnd);        //触摸结束
+
+
+        initScene();                                            //初始化
+        requestAnimationFrame(render);                          //循环渲染
+        
+
+    </script>
+</body>
+
+</html>
